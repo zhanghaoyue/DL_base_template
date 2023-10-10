@@ -1,0 +1,103 @@
+{
+  "name": "dsa_swin3d",
+  "n_gpu": 1,
+  "files": {
+    "patient_file": "G:/BoxDrive/Box Sync/noreflow_project/dsa_data/dsa_dfs/ir_collaterals_1004.csv",
+    "patient_file_filter": "G:/BoxDrive/Box Sync/noreflow_project/dsa_data/dsa_dfs/ir_collaterals_1004_filtered_tici.csv",
+    "result_file": "G:/BoxDrive/Box Sync/noreflow_project/results/IR/mr_results.csv",
+    "data_location": "G:/BoxDrive/Box Sync/noreflow_project/dsa_data/dsa_images/nifti_raw_time",
+    "test_file": "G:/BoxDrive/Box Sync/noreflow_project/dsa_data/dsa_dfs/test_prospective_mr_mtici_0829.csv",
+    "model_path": "G:/BoxDrive/Box Sync/noreflow_project/CT/model_path",
+    "training_path": "G:/BoxDrive/Box Sync/noreflow_project/stroke_training/IR_models/dsa"
+  },
+  "inputs": {
+    "modalities": "DSA",
+    "selection": "first",
+    "paired": true,
+    "padded": true,
+    "label": "Label_2c+",
+    "test_size": 0.2
+  },
+  "arch": {
+    "type": "swin3D",
+    "args": {
+      "pretrained": false,
+      "num_classes": 1,
+      "in_channels": 2,
+      "model_path": "G:/BoxDrive/Box Sync/noreflow_project/pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth"
+    }
+  },
+  "optimizer": {
+    "type": "SGD",
+    "args": {
+      "lr": 5e-2,
+      "momentum": 0.9,
+      "weight_decay": 0.01
+    }
+  },
+  "loss": "bce_focal_loss",
+  "metrics": [
+    "auc"
+  ],
+  "lr_scheduler": {
+    "type": "CosineAnnealingWarmRestarts",
+    "args": {
+      "T_0": 5
+    }
+  },
+  "trainer": {
+    "epochs": 100,
+    "cv_fold": 5,
+    "accumulate_steps": 2,
+    "show_details": true,
+    "mixed_precision": true,
+    "clip_grad": true,
+
+    "save_dir": "G:/BoxDrive/Box Sync/noreflow_project/stroke_training/saved/",
+    "save_period": 1,
+    "verbosity": 2,
+    "monitor": "max val_auc",
+    "early_stop": 5,
+    "tensorboard": true
+  },
+  "preprocessor_steps": {
+    "crop_image": {
+      "tol": 0.01
+    },
+    "clip_image": {
+      "mode": "multiotsu"
+    },
+    "temp_normalize_image": null,
+    "normalize_image_range": null,
+    "resample_image": {
+      "frame_shape": null
+    }
+  },
+  "data_loader_train": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 16,
+      "shuffle": true,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  },
+  "data_loader_valid": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 26,
+      "shuffle": false,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  },
+  "data_loader_test": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 26,
+      "shuffle": false,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  }
+}

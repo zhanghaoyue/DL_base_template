@@ -1,0 +1,118 @@
+{
+  "name": "exp_name",
+  "gpu_id": [
+    0
+  ],
+  "arch": {
+    "type": "model_name",
+    "args": {
+      "num_classes": 1,
+      "in_channels": 3
+    }
+  },
+  "files": {
+    "case_file": "/path-to-/case_file.csv",
+    "case_file_filter": "/path-to-/case_file_filtered_version.csv",
+    "data_location": "/path-to-/data folder",
+    "test_file": "/path-to-/test_case.csv",
+    "model_path": "/path-to-saved model/model_path",
+    "training_path": "/path-to-model-training/"
+  },
+  "inputs": {
+    "modalities": "determine in dataset",
+    "label": "label name for dataframe filter",
+    "test_size": 0
+  },
+  "data_loader": {
+    "type": "TICITemporalNetwork",
+    "args": {
+      "data_dir": "data/",
+      "batch_size": 128,
+      "shuffle": true,
+      "validation_split": 0.1,
+      "num_workers": 2
+    }
+  },
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 0.001,
+      "weight_decay": 0,
+      "amsgrad": true
+    }
+  },
+  "loss": "bce_logits_loss",
+  "metrics": [
+    "auc"
+  ],
+  "lr_scheduler": {
+    "type": "StepLR",
+    "args": {
+      "step_size": 50,
+      "gamma": 0.1
+    }
+  },
+  "trainer": {
+    "epochs": 50,
+    "save_dir": "saved/",
+    "save_period": 1,
+    "verbosity": 2,
+    "monitor": "min val_loss",
+    "early_stop": 50,
+    "tensorboard": false
+  },
+  "label_mapping": {
+    "0": "TICI 0",
+    "1": "TICI 1",
+    "2": "TICI 2a",
+    "3": "TICI 2b",
+    "4": "TICI 3",
+    "5": "TICI 3"
+  },
+  "model_params": {
+    "feature_size": 1280,
+    "num_classes": 1,
+    "in_channels": 3,
+    "output_size": 1280
+  },
+  "preprocessor_steps": {
+    "crop_image": {
+      "tol": 0.01
+    },
+    "clip_image": {
+      "mode": "multiotsu"
+    },
+    "temp_normalize_image": null,
+    "normalize_image_range": null,
+    "resample_image": {
+      "frame_shape": null
+    }
+  },
+  "data_loader_train": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 1,
+      "shuffle": true,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  },
+  "data_loader_valid": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 1,
+      "shuffle": false,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  },
+  "data_loader_test": {
+    "type": "BaseDataLoader",
+    "args": {
+      "batch_size": 1,
+      "shuffle": false,
+      "num_workers": 0,
+      "validation_split": 0
+    }
+  }
+}
