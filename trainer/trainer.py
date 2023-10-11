@@ -54,34 +54,32 @@ class Trainer(BaseTrainer):
         self.train_metrics.reset()
         self.model.train()
         self.optimizer.zero_grad()
+
+        num_steps = len(data_loader)
+        batch_time = AverageMeter()
         loss_meter = AverageMeter()
         norm_meter = AverageMeter()
         scaler_meter = AverageMeter()
-        outputs_epoch = []
-        targets_epoch = []
-        iter = 0
 
-        for batch_idx, (idx, data, targets) in enumerate(self.data_loader):
-            targets = targets.type(torch.LongTensor)
-            data, targets = data.to(self.device), targets.to(self.device)
+        start = time.time()
+        end = time.time()
+
+        for batch_idx, (samples, targets) in enumerate(self.data_loader):
+            samples = samples.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
 
             with torch.cuda.amp.autocast(enabled=self.mixed_precision, dtype=torch.float16):
-                outputs = self.model(data)
-            if iter == 0:
-                outputs_epoch = outputs
-                targets_epoch = targets
-            else:
-                outputs_epoch = torch.cat([outputs_epoch, outputs])
-                targets_epoch = torch.cat([targets_epoch, targets])
+                outputs = self.model(samples)
 
             loss = self.criterion(outputs, targets)
-            loss = loss / self.accumulation_steps + 1e-9
+            loss = loss / self.accumulation_steps + 1e-12
+
             is_second_order = hasattr(self.optimizer, 'is_second_order') and self.optimizer.is_second_order
             grad_norm = self.loss_scaler(loss, self.optimizer, clip_grad=self.clip_grad,
                                          parameters=self.model.parameters(), create_graph=is_second_order,
                                          update_grad=(batch_idx + 1) % self.accumulation_steps == 0)
 
-            if ((batch_idx + 1) % self.accumulation_steps == 0) or (batch_idx + 1 == len(self.data_loader)):
+            if (batch_idx + 1) % self.accumulation_steps == 0:
                 self.optimizer.zero_grad()
                 self.lr_scheduler.step((epoch * self.len_epoch + batch_idx) // self.accumulation_steps)
 
@@ -93,14 +91,18 @@ class Trainer(BaseTrainer):
             if grad_norm is not None:
                 norm_meter.update(grad_norm)
             scaler_meter.update(loss_scale_value)
+            batch_time.update(time.time() - end)
+            end = time.time()
 
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.train_metrics.update('loss', loss.item()*self.accumulation_steps)
 
             if batch_idx % self.log_step == 0:
                 memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
+                etas = batch_time.avg * (self.len_epoch - batch_idx)
                 self.logger.info(
                     f'Train: [{epoch}/{self.total_epoch}][{batch_idx}/{self.len_epoch}]\t'
+                    f'eta {datetime.timedelta(seconds=int(etas))}\t'
                     f'Train loss {loss_meter.val:.4f} ({loss_meter.avg:.4f})\t'
                     f'Train grad_norm {norm_meter.val:.4f} ({norm_meter.avg:.4f})\t'
                     f'Train loss_scale {scaler_meter.val:.4f} ({scaler_meter.avg:.4f})\t'
@@ -108,11 +110,13 @@ class Trainer(BaseTrainer):
 
             if batch_idx == self.len_epoch:
                 break
-            iter += 1
 
         for met in self.metric_ftns:
-            self.train_metrics.update(met.__name__, met(outputs_epoch, targets_epoch))
+            self.train_metrics.update(met.__name__, met(outputs, targets))
         log = self.train_metrics.result()
+
+        epoch_time = time.time() - start
+        logger.info(f"EPOCH {epoch} training takes {datetime.timedelta(seconds=int(epoch_time))}")
 
         if self.do_validation:
             val_log = self._valid_epoch(epoch)
@@ -131,39 +135,21 @@ class Trainer(BaseTrainer):
         self.model.eval()
         self.valid_metrics.reset()
         loss_meter = AverageMeter()
-        pid = []
-        truth = []
-        logits = []
 
-        for batch_idx, (idx, data, targets) in enumerate(self.valid_data_loader):
-            targets = targets.type(torch.LongTensor)
-            data, targets = data.to(self.device), targets.to(self.device)
+        for batch_idx, (samples, targets) in enumerate(self.valid_data_loader):
+            samples = samples.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
 
             with torch.cuda.amp.autocast(enabled=self.mixed_precision, dtype=torch.float16):
-                outputs = self.model(data)
+                outputs = self.model(samples)
             loss = self.criterion(outputs, targets)
             self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
             self.valid_metrics.update('loss', loss.item())
             loss_meter.update(loss.item(), targets.size(0))
-            pid.append(list(idx))
-            truth.append(targets.tolist())
-            logits.append(torch.sigmoid(outputs).tolist())
+
             for met in self.metric_ftns:
                 self.valid_metrics.update(met.__name__, met(outputs, targets))
 
-        if self.show_details:
-            logits = list(np.squeeze(sum(logits, [])))
-            truth = sum(truth, [])
-            threshold = module_metric.Find_Optimal_Cutoff(logits, truth)
-            pred = list((logits >= threshold) * 1)
-            roc_auc = skmetrics.roc_auc_score(truth, logits)
-            acc = skmetrics.roc_auc_score(truth, pred)
-
-            self.logger.info(
-                             f'Valid Loss: {loss_meter.val:.4f} ({loss_meter.avg:.4f})\t'
-                             f'Valid AUC: {np.round(roc_auc, 5)}\t'
-                             f'Valid Acc: {np.round(acc, 5)}'
-                             )
         return self.valid_metrics.result()
 
     def evaluate(self, mode='valid', verbose=False):

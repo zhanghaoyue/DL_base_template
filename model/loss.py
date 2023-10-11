@@ -1,10 +1,6 @@
-def nll_loss(output, target):
-    return F.nll_loss(output, target)
-
-
 import torch
 import torch.nn.functional as F
-# from utils import util, custom_loss
+from loss_util import custom_loss
 from sklearn.metrics import normalized_mutual_info_score as nmi_score
 
 multiclass = False

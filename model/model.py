@@ -1,23 +1,28 @@
 import torchvision
-
-from model.arch.deeptici import TICIModelHandler as tici
-# from model.arch.mtv import MTVMultiheadClassificationModel as mtv
 from model.arch.spatiotemporaltransformer import Net
 from model.arch.timesformer import TimeSformer as tsformer
 import model.arch.swin_transformer_3d as swin3d
 import utils
 from collections import OrderedDict
 import torch
+import monai
 import pathlib
-
-
-def TICIModelHandler(pretrained=False, **kwargs):
-    model = tici(num_classes=kwargs['num_classes'], feature_size=kwargs['feature_size'])
-    return model
 
 
 def STNet(pretrained=False, **kwargs):
     model = Net()
+    return model
+
+
+def Unet(pretrained=False, **kwargs):
+    model = monai.networks.nets.UNet(
+        spatial_dims=2,
+        in_channels=1,
+        out_channels=1,
+        channels=(16, 32, 64, 128, 256),
+        strides=(2, 2, 2, 2),
+        num_res_units=2,
+    )
     return model
 
 

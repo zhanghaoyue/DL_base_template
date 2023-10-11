@@ -1,5 +1,6 @@
 import numpy as np
 import sklearn.metrics as skmetrics
+from monai.metrics import DiceMetric
 import torch
 
 
@@ -15,9 +16,16 @@ def accuracy(output, target):
             accu = skmetrics.accuracy_score(target, pred)
         else:
             output = output.cpu().detach().numpy()
-            threshold = Find_Optimal_Cutoff(output, target)
+            _, _, threshold = Find_Optimal_Cutoff(output, target)
             accu = skmetrics.accuracy_score(target, (output >= threshold))
     return accu
+
+
+def dice_score(output, target):
+    dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+    with torch.no_grad():
+        dice_score = dice_metric(y_pred=output, y=target)
+    return dice_score
 
 
 def precision_score(output, target):
@@ -26,7 +34,7 @@ def precision_score(output, target):
         target = torch.unsqueeze(target, 1)
         output = output.cpu().detach().numpy()
         target = target.cpu().detach().numpy()
-        threshold = Find_Optimal_Cutoff(output, target)
+        _, _, threshold = Find_Optimal_Cutoff(output, target)
         precision = skmetrics.precision_score(target, (output >= threshold))
     return precision
 
@@ -37,7 +45,7 @@ def sensitivity(output, target):
         target = torch.unsqueeze(target, 1)
         output = output.cpu().detach().numpy()
         target = target.cpu().detach().numpy()
-        fpr, tpr, threshold = Find_Optimal_Cutoff_2(output, target)
+        fpr, tpr, threshold = Find_Optimal_Cutoff(output, target)
         sens = tpr
     return sens
 
@@ -48,7 +56,7 @@ def specificity(output, target):
         target = torch.unsqueeze(target, 1)
         output = output.cpu().detach().numpy()
         target = target.cpu().detach().numpy()
-        fpr, tpr, threshold = Find_Optimal_Cutoff_2(output, target)
+        fpr, tpr, threshold = Find_Optimal_Cutoff(output, target)
         spec = 1 - fpr
     return spec
 
@@ -59,7 +67,7 @@ def sens_spec_combo(output, target):
         truth = torch.unsqueeze(target, 1)
         pred = pred.cpu().detach().numpy()
         truth = truth.cpu().detach().numpy()
-        fpr, tpr, threshold = Find_Optimal_Cutoff_2(truth, pred)
+        fpr, tpr, threshold = Find_Optimal_Cutoff(truth, pred)
         sens = tpr
         spec = 1 - fpr
         combo = (0.8 * sens + 1.2 * spec) / 2
@@ -142,27 +150,6 @@ def roc_curve(output, target):
 
 
 def Find_Optimal_Cutoff(output, target):
-    """ Find the optimal probability cutoff point for a classification model related to event rate
-    Parameters
-    ----------
-    target : Matrix with dependent or target data, where rows are observations
-
-    output : Matrix with predicted data, where rows are observations
-
-    Returns
-    -------
-    list type, with optimal cutoff value
-
-    """
-    fpr, tpr, threshold = skmetrics.roc_curve(target, output)
-
-    best_threshold_idx = np.argmax(tpr - fpr)
-    best_threshold = threshold[best_threshold_idx]
-
-    return best_threshold
-
-
-def Find_Optimal_Cutoff_2(output, target):
     """ Find the optimal probability cutoff point for a classification model related to event rate
     Parameters
     ----------

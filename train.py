@@ -6,7 +6,7 @@ import numpy as np
 import os
 import torch
 
-import data_loader.dataset_dsa as dsa_loader
+import data_loader.dataset_sample as dsa_loader
 import model.loss as module_loss
 import model.metric as module_metric
 import model.model as module_pool
